@@ -1,0 +1,13 @@
+## User settings
+xcuserdata/
+
+## Derived data
+DerivedData/
+
+## System files
+.DS_Store
+
+## Build generated
+build/
+*.moved-aside
+*.xcuserstate
