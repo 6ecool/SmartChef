@@ -63,7 +63,8 @@ class MealPlannerViewController: UIViewController {
         view.backgroundColor = .systemBackground
         title = "Meal Plan"
         navigationController?.navigationBar.prefersLargeTitles = true
-        
+        tableView.delegate = self
+        tableView.dataSource = self
         setupUI()
         loadData()
     }
@@ -137,6 +138,40 @@ class MealPlannerViewController: UIViewController {
         emptyLabel.isHidden = !isEmpty
         tableView.isHidden = isEmpty
     }
+    // MARK: - Helper Methods
+
+    private func getMeal(for indexPath: IndexPath) -> Recipe {
+            // 1. Достаем объект из Core Data
+            let item: MealPlanItem
+            
+            switch indexPath.section {
+            case 0:
+                item = breakfastItems[indexPath.row]
+            case 1:
+                item = lunchItems[indexPath.row]
+            default:
+                item = dinnerItems[indexPath.row]
+            }
+            
+            // 2. Создаем Recipe, заполняя пропуски заглушками
+            return Recipe(
+                id: Int(item.id),
+                title: item.title ?? "Unknown",
+                image: item.image ?? "",
+                // imageType: "jpg", // УДАЛЯЕМ: Ошибка "Extra argument"
+                
+                // ДОБАВЛЯЕМ недостающие параметры (заглушки):
+                readyInMinutes: 0,
+                servings: 0,
+                // Возможно, ваша структура Nutrition требует init.
+                // Если код ниже подчеркнет красным, покажите файл Nutrition.swift
+                nutrition: Nutrition(nutrients: []),
+                extendedIngredients: [],
+                analyzedInstructions: [],
+                summary: "Details loaded from Meal Plan",
+                instructions: ""
+            )
+        }
 }
 
 // MARK: - TableView DataSource & Delegate
@@ -217,9 +252,19 @@ extension MealPlannerViewController: UITableViewDataSource, UITableViewDelegate 
     
     // Нажатие на ячейку (переход к деталям)
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        tableView.deselectRow(at: indexPath, animated: true)
-        
-        // Тут можно реализовать открытие деталей рецепта
-        // Для этого нужно будет сконвертировать MealPlanItem обратно в Recipe, как мы делали в Favorites
-    }
+            tableView.deselectRow(at: indexPath, animated: true)
+            
+            // Получаем рецепт (с заглушками)
+            let selectedMeal = getMeal(for: indexPath)
+            
+            // ОШИБКА БЫЛА ЗДЕСЬ:
+            // Раньше было: let detailVC = RecipeDetailViewController()
+            // Нужно передать рецепт в скобки, так как init требует его:
+            let detailVC = RecipeDetailViewController(recipe: selectedMeal)
+            
+            // detailVC.recipe = selectedMeal // Эту строку можно удалить, если передали в init
+            
+            navigationController?.pushViewController(detailVC, animated: true)
+        }
+    
 }

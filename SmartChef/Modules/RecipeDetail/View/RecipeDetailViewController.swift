@@ -1,9 +1,11 @@
 import UIKit
 import SnapKit
+import Kingfisher
 
 class RecipeDetailViewController: UIViewController {
     
-    private let recipe: Recipe
+    // ВАЖНО: var, чтобы обновлять данные после загрузки
+    var recipe: Recipe
     private var isFavorite: Bool = false
     
     // Логика порций
@@ -130,6 +132,12 @@ class RecipeDetailViewController: UIViewController {
     private lazy var ingredientsHeader = createHeaderLabel(text: "Ingredients")
     private lazy var instructionsHeader = createHeaderLabel(text: "Instructions")
     
+    private let loadingIndicator: UIActivityIndicatorView = {
+        let spinner = UIActivityIndicatorView(style: .medium)
+        spinner.hidesWhenStopped = true
+        return spinner
+    }()
+    
     private func createHeaderLabel(text: String) -> UILabel {
         let label = UILabel()
         label.text = text
@@ -173,6 +181,11 @@ class RecipeDetailViewController: UIViewController {
         
         isFavorite = CoreDataManager.shared.isFavorite(recipeID: recipe.id)
         updateLikeButtonState()
+        
+        // ИСПРАВЛЕНИЕ 1: Безопасная проверка опционалов (?? true)
+        if (recipe.extendedIngredients?.isEmpty ?? true) || recipe.readyInMinutes == 0 {
+            fetchFullRecipeDetails()
+        }
     }
     
     override func viewWillAppear(_ animated: Bool) {
@@ -182,6 +195,29 @@ class RecipeDetailViewController: UIViewController {
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         navigationController?.setNavigationBarHidden(false, animated: animated)
+    }
+    
+    // MARK: - Network Fetch
+    
+    private func fetchFullRecipeDetails() {
+        loadingIndicator.startAnimating()
+        
+        // Эта строка заработает, когда вы выполните ШАГ 1 (добавите функцию в NetworkManager)
+        NetworkManager.shared.getRecipeInformation(id: recipe.id) { [weak self] result in
+            DispatchQueue.main.async {
+                self?.loadingIndicator.stopAnimating()
+                switch result {
+                case .success(let fullRecipe):
+                    print("Full details loaded for \(fullRecipe.title)")
+                    self?.recipe = fullRecipe
+                    self?.originalServings = fullRecipe.servings ?? 2
+                    self?.currentServings = fullRecipe.servings ?? 2
+                    self?.configureData() // Обновляем UI новыми данными
+                case .failure(let error):
+                    print("Error loading details: \(error)")
+                }
+            }
+        }
     }
     
     // MARK: - Setup UI
@@ -229,6 +265,13 @@ class RecipeDetailViewController: UIViewController {
         whiteContainer.snp.makeConstraints { make in
             make.top.equalTo(heroImageView.snp.bottom).offset(-40)
             make.leading.trailing.bottom.equalToSuperview()
+        }
+        
+        // Добавляем индикатор загрузки
+        whiteContainer.addSubview(loadingIndicator)
+        loadingIndicator.snp.makeConstraints { make in
+            make.top.equalTo(whiteContainer).offset(20)
+            make.centerX.equalToSuperview()
         }
         
         // Добавляем элементы
@@ -332,26 +375,39 @@ class RecipeDetailViewController: UIViewController {
     // MARK: - Logic & Config
     
     private func configureData() {
-        if let url = recipe.image { heroImageView.loadImage(from: url) }
+        // ИСПРАВЛЕНИЕ 2: Безопасное извлечение URL (String? -> String -> URL)
+        if let imageString = recipe.image, let url = URL(string: imageString) {
+            heroImageView.kf.setImage(with: url)
+        }
+        
         titleLabel.text = recipe.title
         timeLabel.text = "⏱ \(recipe.readyInMinutes ?? 0) min"
         
-        // Вот здесь мы вызываем восстановленный метод
+        // Нутриенты и порции
         setupNutrition()
         updateServingsUI()
         
+        // Инструкции
         instructionsStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        
         if let steps = recipe.analyzedInstructions?.first?.steps, !steps.isEmpty {
             for step in steps {
                 let row = createInstructionRow(number: step.number, text: step.step)
                 instructionsStack.addArrangedSubview(row)
             }
         } else if let summary = recipe.summary {
+            // Если шагов нет (или они не загрузились), показываем Summary, очищая HTML теги
             let clean = summary.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression, range: nil)
             let label = UILabel()
             label.text = clean
             label.numberOfLines = 0
             label.font = .systemFont(ofSize: 16)
+            instructionsStack.addArrangedSubview(label)
+        } else {
+            // Если и summary нет (пустые данные)
+            let label = UILabel()
+            label.text = "Fetching instructions..."
+            label.textColor = .secondaryLabel
             instructionsStack.addArrangedSubview(label)
         }
     }
@@ -360,17 +416,27 @@ class RecipeDetailViewController: UIViewController {
         servingsLabel.text = "\(currentServings) Servings"
         ingredientsStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         
-        guard let ingredients = recipe.extendedIngredients else { return }
-        
-        for ing in ingredients {
-            var text = ing.original ?? ing.name ?? ""
-            if let amount = ing.amount, let unit = ing.unit, originalServings > 0 {
-                let newAmount = (amount / Double(originalServings)) * Double(currentServings)
-                let formattedAmount = String(format: "%.1f", newAmount)
-                text = "\(formattedAmount) \(unit) \(ing.name ?? "")"
+        // Проверка: есть ли ингредиенты
+        if let ingredients = recipe.extendedIngredients, !ingredients.isEmpty {
+            for ing in ingredients {
+                var text = ing.original ?? ing.name ?? ""
+                
+                // Пересчет порций
+                if let amount = ing.amount, let unit = ing.unit, originalServings > 0 {
+                    let newAmount = (amount / Double(originalServings)) * Double(currentServings)
+                    let formattedAmount = String(format: "%.1f", newAmount)
+                    text = "\(formattedAmount) \(unit) \(ing.name ?? "")"
+                }
+                
+                let row = createIngredientRow(text: text)
+                ingredientsStack.addArrangedSubview(row)
             }
-            let row = createIngredientRow(text: text)
-            ingredientsStack.addArrangedSubview(row)
+        } else {
+            // Заглушка, если ингредиентов нет
+            let label = UILabel()
+            label.text = "Ingredients loading..."
+            label.textColor = .secondaryLabel
+            ingredientsStack.addArrangedSubview(label)
         }
     }
     
@@ -386,14 +452,25 @@ class RecipeDetailViewController: UIViewController {
         }
     }
     
-    // MARK: - Helper Views (ВОССТАНОВЛЕННЫЕ)
+    // MARK: - Helper Views
     
     private func setupNutrition() {
+        // Очищаем старое (важно при перезагрузке данных)
+        nutritionStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        
+        // Получаем нутриенты безопасно
+        let nutrients = recipe.nutrition?.nutrients ?? []
+        
+        let cal = nutrients.first(where: { $0.name == "Calories" })?.amount ?? 0
+        let pro = nutrients.first(where: { $0.name == "Protein" })?.amount ?? 0
+        let fat = nutrients.first(where: { $0.name == "Fat" })?.amount ?? 0
+        let carb = nutrients.first(where: { $0.name == "Carbohydrates" })?.amount ?? 0
+        
         let items = [
-            ("Calories", "\(recipe.calories)"),
-            ("Protein", recipe.protein),
-            ("Fat", recipe.fat),
-            ("Carbs", recipe.carbs)
+            ("Calories", "\(Int(cal)) kcal"),
+            ("Protein", "\(Int(pro))g"),
+            ("Fat", "\(Int(fat))g"),
+            ("Carbs", "\(Int(carb))g")
         ]
         
         for item in items {
@@ -497,7 +574,7 @@ class RecipeDetailViewController: UIViewController {
     
     @objc private func didTapStartCooking() {
         guard let steps = recipe.analyzedInstructions?.first?.steps, !steps.isEmpty else {
-            let alert = UIAlertController(title: "Oops", message: "No step-by-step instructions.", preferredStyle: .alert)
+            let alert = UIAlertController(title: "Oops", message: "No step-by-step instructions available.", preferredStyle: .alert)
             alert.addAction(UIAlertAction(title: "OK", style: .default))
             present(alert, animated: true)
             return

@@ -60,4 +60,29 @@ class NetworkManager {
             throw NetworkError.decodingError
         }
     }
+    // Вставьте это внутрь class NetworkManager { ... }
+
+    func getRecipeInformation(id: Int, completion: @escaping (Result<Recipe, Error>) -> Void) {
+        // Формируем URL: https://api.spoonacular.com/recipes/{id}/information
+        let urlString = "https://api.spoonacular.com/recipes/\(id)/information?apiKey=\(apiKey)&includeNutrition=true"
+        
+        guard let url = URL(string: urlString) else { return }
+        
+        URLSession.shared.dataTask(with: url) { data, _, error in
+            if let error = error {
+                completion(.failure(error))
+                return
+            }
+            
+            guard let data = data else { return }
+            
+            do {
+                let recipe = try JSONDecoder().decode(Recipe.self, from: data)
+                completion(.success(recipe))
+            } catch {
+                print("Decoding error: \(error)") // Полезно для отладки
+                completion(.failure(error))
+            }
+        }.resume()
+    }
 }
