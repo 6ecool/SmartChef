@@ -1,29 +1,72 @@
-// Modules/Discover/ViewModel/DiscoverViewModel.swift
 import Foundation
 
 class DiscoverViewModel {
     
-    // Observable (наблюдаемые) данные.
-    // Когда они обновятся, View узнает об этом.
-    var recipes: [Recipe] = []
+    let categories = ["Breakfast", "Lunch", "Dinner", "Vegan", "Dessert"]
+    var selectedCategoryIndex = 0
     
-    // Замыкание (callback), которое мы вызовем, когда данные загрузятся
+    var recipes: [Recipe] = []
     var onDataUpdated: (() -> Void)?
     
+    // MARK: - Fetch Logic
+    
+    // 1. Загрузка по Категории (как раньше)
     func fetchRecipes() {
-        let urlString = "https://api.spoonacular.com/recipes/complexSearch?apiKey=YOUR_KEY&number=10"
+        let categoryName = categories[selectedCategoryIndex].lowercased()
+        performRequest(query: nil, type: categoryName)
+    }
+    
+    // 2. Загрузка по Поиску (НОВОЕ)
+    func searchRecipes(query: String) {
+        // Сбрасываем категорию визуально, так как ищем по тексту
+        performRequest(query: query, type: nil)
+    }
+    
+    // Общая функция запроса
+    private func performRequest(query: String?, type: String?) {
+        var queryItems = [
+            URLQueryItem(name: "number", value: "20"), // Один раз!
+            
+            // ВАЖНО: Эти параметры включают инструкции и ингредиенты
+            URLQueryItem(name: "addRecipeInformation", value: "true"),
+            URLQueryItem(name: "fillIngredients", value: "true"),
+            URLQueryItem(name: "addRecipeNutrition", value: "true"),
+            URLQueryItem(name: "instructionsRequired", value: "true")
+        ]
+        
+        // Если ищем по тексту
+        if let query = query, !query.isEmpty {
+            queryItems.append(URLQueryItem(name: "query", value: query))
+        }
+        
+        // Если ищем по категории
+        if let type = type {
+            queryItems.append(URLQueryItem(name: "type", value: type))
+        }
+        
+        guard let url = NetworkManager.shared.createURL(
+            for: "/recipes/complexSearch",
+            queryItems: queryItems
+        ) else { return }
+        
+        print("📡 Requesting: \(url.absoluteString)") // Смотри в консоль, чтобы проверить URL
         
         Task {
             do {
-                let response: RecipeResponse = try await NetworkManager.shared.fetch(from: urlString)
+                let response: RecipeResponse = try await NetworkManager.shared.fetch(from: url)
                 self.recipes = response.results
                 
-                // Возвращаемся в главный поток, чтобы обновить UI
+                // Проверка для отладки
+                if let first = self.recipes.first {
+                    print("✅ Loaded: \(first.title)")
+                    print("   Steps count: \(first.analyzedInstructions?.first?.steps.count ?? 0)")
+                }
+                
                 await MainActor.run {
                     self.onDataUpdated?()
                 }
             } catch {
-                print("Error fetching: \(error)")
+                print("❌ Error fetching recipes: \(error)")
             }
         }
     }
