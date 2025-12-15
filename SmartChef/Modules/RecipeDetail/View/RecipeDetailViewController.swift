@@ -4,15 +4,13 @@ import Kingfisher
 
 class RecipeDetailViewController: UIViewController {
     
-    // ВАЖНО: var, чтобы обновлять данные после загрузки
     var recipe: Recipe
     private var isFavorite: Bool = false
     
-    // Логика порций
     private var originalServings: Int
     private var currentServings: Int
     
-    // MARK: - UI Components
+    var editingMealPlanItem: MealPlanItem?
     
     private let scrollView: UIScrollView = {
         let sv = UIScrollView()
@@ -31,7 +29,6 @@ class RecipeDetailViewController: UIViewController {
         return iv
     }()
     
-    // Buttons
     private lazy var backButton: UIButton = {
         let btn = UIButton()
         btn.setImage(UIImage(systemName: "chevron.left"), for: .normal)
@@ -62,20 +59,14 @@ class RecipeDetailViewController: UIViewController {
         return btn
     }()
     
-    // White Container
     private let whiteContainer: UIView = {
         let view = UIView()
         view.backgroundColor = .systemBackground
         view.layer.cornerRadius = 30
         view.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
-        view.layer.shadowColor = UIColor.black.cgColor
-        view.layer.shadowOpacity = 0.1
-        view.layer.shadowOffset = CGSize(width: 0, height: -4)
-        view.layer.shadowRadius = 10
         return view
     }()
     
-    // Labels
     private let titleLabel: UILabel = {
         let label = UILabel()
         label.font = .systemFont(ofSize: 24, weight: .bold)
@@ -90,7 +81,6 @@ class RecipeDetailViewController: UIViewController {
         return label
     }()
     
-    // --- STEPPER UI ---
     private let servingsContainer: UIView = {
         let view = UIView()
         view.backgroundColor = .systemGray6
@@ -118,12 +108,10 @@ class RecipeDetailViewController: UIViewController {
     
     private let servingsLabel: UILabel = {
         let label = UILabel()
-        label.text = "2 Servings"
         label.font = .systemFont(ofSize: 14, weight: .bold)
         label.textAlignment = .center
         return label
     }()
-    // ------------------
     
     private let nutritionStack = UIStackView()
     private let ingredientsStack = UIStackView()
@@ -138,14 +126,6 @@ class RecipeDetailViewController: UIViewController {
         return spinner
     }()
     
-    private func createHeaderLabel(text: String) -> UILabel {
-        let label = UILabel()
-        label.text = text
-        label.font = .systemFont(ofSize: 20, weight: .bold)
-        return label
-    }
-    
-    // Bottom Panel
     private let bottomButtonContainer: UIVisualEffectView = {
         let blur = UIBlurEffect(style: .systemChromeMaterial)
         return UIVisualEffectView(effect: blur)
@@ -162,29 +142,37 @@ class RecipeDetailViewController: UIViewController {
         return btn
     }()
     
-    // MARK: - Init
-    init(recipe: Recipe) {
+    private func createHeaderLabel(text: String) -> UILabel {
+        let label = UILabel()
+        label.text = text
+        label.font = .systemFont(ofSize: 20, weight: .bold)
+        return label
+    }
+    
+    init(recipe: Recipe, initialServings: Int? = nil) {
         self.recipe = recipe
-        self.originalServings = recipe.servings ?? 2
-        self.currentServings = self.originalServings
+        self.originalServings = recipe.servings ?? 1
+        self.currentServings = initialServings ?? self.originalServings
         super.init(nibName: nil, bundle: nil)
     }
     
     required init?(coder: NSCoder) { fatalError() }
     
-    // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .systemBackground
         setupUI()
-        configureData()
         
         isFavorite = CoreDataManager.shared.isFavorite(recipeID: recipe.id)
         updateLikeButtonState()
         
-        // ИСПРАВЛЕНИЕ 1: Безопасная проверка опционалов (?? true)
-        if (recipe.extendedIngredients?.isEmpty ?? true) || recipe.readyInMinutes == 0 {
-            fetchFullRecipeDetails()
+        configureData()
+        
+        // Если это не редактирование существующего, то можно подгружать детали
+        if editingMealPlanItem == nil {
+            if (recipe.extendedIngredients?.isEmpty ?? true) || recipe.readyInMinutes == 0 {
+                fetchFullRecipeDetails()
+            }
         }
     }
     
@@ -192,190 +180,33 @@ class RecipeDetailViewController: UIViewController {
         super.viewWillAppear(animated)
         navigationController?.setNavigationBarHidden(true, animated: animated)
     }
+    
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         navigationController?.setNavigationBarHidden(false, animated: animated)
     }
     
-    // MARK: - Network Fetch
-    
     private func fetchFullRecipeDetails() {
         loadingIndicator.startAnimating()
-        
-        // Эта строка заработает, когда вы выполните ШАГ 1 (добавите функцию в NetworkManager)
         NetworkManager.shared.getRecipeInformation(id: recipe.id) { [weak self] result in
             DispatchQueue.main.async {
                 self?.loadingIndicator.stopAnimating()
                 switch result {
                 case .success(let fullRecipe):
-                    print("Full details loaded for \(fullRecipe.title)")
                     self?.recipe = fullRecipe
-                    self?.originalServings = fullRecipe.servings ?? 2
-                    self?.currentServings = fullRecipe.servings ?? 2
-                    self?.configureData() // Обновляем UI новыми данными
+                    if self?.editingMealPlanItem == nil {
+                        self?.originalServings = fullRecipe.servings ?? 1
+                        self?.currentServings = self?.originalServings ?? 1
+                    }
+                    self?.configureData()
                 case .failure(let error):
-                    print("Error loading details: \(error)")
+                    print(error)
                 }
             }
         }
     }
     
-    // MARK: - Setup UI
-    private func setupUI() {
-        view.addSubview(scrollView)
-        scrollView.snp.makeConstraints { make in
-            make.top.leading.trailing.equalToSuperview()
-            make.bottom.equalTo(view.safeAreaLayoutGuide.snp.bottom).offset(-80)
-        }
-        
-        scrollView.addSubview(contentView)
-        contentView.snp.makeConstraints { make in
-            make.edges.width.equalToSuperview()
-        }
-        
-        contentView.addSubview(heroImageView)
-        heroImageView.snp.makeConstraints { make in
-            make.top.leading.trailing.equalToSuperview()
-            make.height.equalTo(320)
-        }
-        
-        view.addSubview(backButton)
-        view.addSubview(likeButton)
-        view.addSubview(planButton)
-        
-        backButton.snp.makeConstraints { make in
-            make.top.equalTo(view.safeAreaLayoutGuide).offset(10)
-            make.leading.equalToSuperview().offset(16)
-            make.width.height.equalTo(40)
-        }
-        
-        likeButton.snp.makeConstraints { make in
-            make.top.equalTo(backButton)
-            make.trailing.equalToSuperview().offset(-16)
-            make.width.height.equalTo(40)
-        }
-        
-        planButton.snp.makeConstraints { make in
-            make.top.equalTo(backButton)
-            make.trailing.equalTo(likeButton.snp.leading).offset(-12)
-            make.width.height.equalTo(40)
-        }
-        
-        contentView.addSubview(whiteContainer)
-        whiteContainer.snp.makeConstraints { make in
-            make.top.equalTo(heroImageView.snp.bottom).offset(-40)
-            make.leading.trailing.bottom.equalToSuperview()
-        }
-        
-        // Добавляем индикатор загрузки
-        whiteContainer.addSubview(loadingIndicator)
-        loadingIndicator.snp.makeConstraints { make in
-            make.top.equalTo(whiteContainer).offset(20)
-            make.centerX.equalToSuperview()
-        }
-        
-        // Добавляем элементы
-        whiteContainer.addSubview(titleLabel)
-        whiteContainer.addSubview(timeLabel)
-        whiteContainer.addSubview(nutritionStack)
-        
-        // Stepper
-        whiteContainer.addSubview(servingsContainer)
-        servingsContainer.addSubview(minusButton)
-        servingsContainer.addSubview(servingsLabel)
-        servingsContainer.addSubview(plusButton)
-        
-        whiteContainer.addSubview(ingredientsHeader)
-        whiteContainer.addSubview(ingredientsStack)
-        whiteContainer.addSubview(instructionsHeader)
-        whiteContainer.addSubview(instructionsStack)
-        
-        // Constraints
-        titleLabel.snp.makeConstraints { make in
-            make.top.equalToSuperview().offset(30)
-            make.leading.trailing.equalToSuperview().inset(24)
-        }
-        
-        timeLabel.snp.makeConstraints { make in
-            make.top.equalTo(titleLabel.snp.bottom).offset(8)
-            make.leading.trailing.equalToSuperview().inset(24)
-        }
-        
-        nutritionStack.axis = .horizontal
-        nutritionStack.distribution = .fillEqually
-        nutritionStack.spacing = 12
-        nutritionStack.snp.makeConstraints { make in
-            make.top.equalTo(timeLabel.snp.bottom).offset(24)
-            make.leading.trailing.equalToSuperview().inset(24)
-            make.height.equalTo(70)
-        }
-        
-        // Stepper Constraints
-        servingsContainer.snp.makeConstraints { make in
-            make.top.equalTo(nutritionStack.snp.bottom).offset(24)
-            make.centerX.equalToSuperview()
-            make.width.equalTo(160)
-            make.height.equalTo(40)
-        }
-        
-        minusButton.snp.makeConstraints { make in
-            make.leading.top.bottom.equalToSuperview()
-            make.width.equalTo(40)
-        }
-        
-        plusButton.snp.makeConstraints { make in
-            make.trailing.top.bottom.equalToSuperview()
-            make.width.equalTo(40)
-        }
-        
-        servingsLabel.snp.makeConstraints { make in
-            make.center.equalToSuperview()
-        }
-        
-        // Остальные элементы
-        ingredientsHeader.snp.makeConstraints { make in
-            make.top.equalTo(servingsContainer.snp.bottom).offset(32)
-            make.leading.trailing.equalToSuperview().inset(24)
-        }
-        
-        ingredientsStack.axis = .vertical
-        ingredientsStack.spacing = 12
-        ingredientsStack.snp.makeConstraints { make in
-            make.top.equalTo(ingredientsHeader.snp.bottom).offset(16)
-            make.leading.trailing.equalToSuperview().inset(24)
-        }
-        
-        instructionsHeader.snp.makeConstraints { make in
-            make.top.equalTo(ingredientsStack.snp.bottom).offset(32)
-            make.leading.trailing.equalToSuperview().inset(24)
-        }
-        
-        instructionsStack.axis = .vertical
-        instructionsStack.spacing = 16
-        instructionsStack.snp.makeConstraints { make in
-            make.top.equalTo(instructionsHeader.snp.bottom).offset(16)
-            make.leading.trailing.equalToSuperview().inset(24)
-            make.bottom.equalToSuperview().offset(-40)
-        }
-        
-        // Bottom Button
-        view.addSubview(bottomButtonContainer)
-        bottomButtonContainer.contentView.addSubview(cookButton)
-        bottomButtonContainer.snp.makeConstraints { make in
-            make.leading.trailing.bottom.equalToSuperview()
-            make.height.equalTo(100)
-        }
-        cookButton.snp.makeConstraints { make in
-            make.top.equalToSuperview().offset(16)
-            make.leading.trailing.equalToSuperview().inset(20)
-            make.height.equalTo(54)
-        }
-    }
-    
-    // MARK: - Logic & Config
-    
     private func configureData() {
-        // ИСПРАВЛЕНИЕ 2: Безопасное извлечение URL (String? -> String -> URL)
         if let imageString = recipe.image, let url = URL(string: imageString) {
             heroImageView.kf.setImage(with: url)
         }
@@ -383,11 +214,9 @@ class RecipeDetailViewController: UIViewController {
         titleLabel.text = recipe.title
         timeLabel.text = "⏱ \(recipe.readyInMinutes ?? 0) min"
         
-        // Нутриенты и порции
         setupNutrition()
         updateServingsUI()
         
-        // Инструкции
         instructionsStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         
         if let steps = recipe.analyzedInstructions?.first?.steps, !steps.isEmpty {
@@ -396,7 +225,6 @@ class RecipeDetailViewController: UIViewController {
                 instructionsStack.addArrangedSubview(row)
             }
         } else if let summary = recipe.summary {
-            // Если шагов нет (или они не загрузились), показываем Summary, очищая HTML теги
             let clean = summary.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression, range: nil)
             let label = UILabel()
             label.text = clean
@@ -404,7 +232,6 @@ class RecipeDetailViewController: UIViewController {
             label.font = .systemFont(ofSize: 16)
             instructionsStack.addArrangedSubview(label)
         } else {
-            // Если и summary нет (пустые данные)
             let label = UILabel()
             label.text = "Fetching instructions..."
             label.textColor = .secondaryLabel
@@ -416,134 +243,70 @@ class RecipeDetailViewController: UIViewController {
         servingsLabel.text = "\(currentServings) Servings"
         ingredientsStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         
-        // Проверка: есть ли ингредиенты
-        if let ingredients = recipe.extendedIngredients, !ingredients.isEmpty {
-            for ing in ingredients {
-                var text = ing.original ?? ing.name ?? ""
-                
-                // Пересчет порций
-                if let amount = ing.amount, let unit = ing.unit, originalServings > 0 {
-                    let newAmount = (amount / Double(originalServings)) * Double(currentServings)
-                    let formattedAmount = String(format: "%.1f", newAmount)
-                    text = "\(formattedAmount) \(unit) \(ing.name ?? "")"
-                }
-                
-                let row = createIngredientRow(text: text)
-                ingredientsStack.addArrangedSubview(row)
-            }
-        } else {
-            // Заглушка, если ингредиентов нет
+        let calculatedIngredients = getCalculatedIngredients()
+        
+        if calculatedIngredients.isEmpty {
             let label = UILabel()
             label.text = "Ingredients loading..."
             label.textColor = .secondaryLabel
             ingredientsStack.addArrangedSubview(label)
+            return
+        }
+        
+        for ing in calculatedIngredients {
+            let amount = ing.amount ?? 0
+            let formattedAmount = amount.truncatingRemainder(dividingBy: 1) == 0
+                ? String(format: "%.0f", amount)
+                : String(format: "%.1f", amount)
+            
+            let text = "\(formattedAmount) \(ing.unit ?? "") \(ing.name ?? "")"
+            let row = createIngredientRow(text: text)
+            ingredientsStack.addArrangedSubview(row)
+        }
+    }
+    
+    private func getCalculatedIngredients() -> [Ingredient] {
+        guard let baseIngredients = recipe.extendedIngredients else { return [] }
+        
+        let ratio = Double(currentServings) / Double(originalServings > 0 ? originalServings : 1)
+        
+        return baseIngredients.map { ing in
+            var newAmount = ing.amount
+            if let amount = ing.amount {
+                newAmount = amount * ratio
+            }
+            return Ingredient(id: ing.id, name: ing.name, original: ing.original, amount: newAmount, unit: ing.unit)
+        }
+    }
+    
+    private func autoSaveIfEditing() {
+        if let item = editingMealPlanItem {
+            let nutrients = recipe.nutrition?.nutrients ?? []
+            let baseCals = nutrients.first(where: { $0.name == "Calories" })?.amount ?? Double(recipe.calories)
+            
+            CoreDataManager.shared.updateMealPlanItem(item, newServings: currentServings, baseCals: baseCals)
+            
+            let gen = UISelectionFeedbackGenerator()
+            gen.selectionChanged()
         }
     }
     
     @objc private func increaseServings() {
         currentServings += 1
         updateServingsUI()
+        setupNutrition()
+        autoSaveIfEditing()
     }
     
     @objc private func decreaseServings() {
         if currentServings > 1 {
             currentServings -= 1
             updateServingsUI()
+            setupNutrition()
+            autoSaveIfEditing()
         }
     }
     
-    // MARK: - Helper Views
-    
-    private func setupNutrition() {
-        // Очищаем старое (важно при перезагрузке данных)
-        nutritionStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        
-        // Получаем нутриенты безопасно
-        let nutrients = recipe.nutrition?.nutrients ?? []
-        
-        let cal = nutrients.first(where: { $0.name == "Calories" })?.amount ?? 0
-        let pro = nutrients.first(where: { $0.name == "Protein" })?.amount ?? 0
-        let fat = nutrients.first(where: { $0.name == "Fat" })?.amount ?? 0
-        let carb = nutrients.first(where: { $0.name == "Carbohydrates" })?.amount ?? 0
-        
-        let items = [
-            ("Calories", "\(Int(cal)) kcal"),
-            ("Protein", "\(Int(pro))g"),
-            ("Fat", "\(Int(fat))g"),
-            ("Carbs", "\(Int(carb))g")
-        ]
-        
-        for item in items {
-            let view = UIView()
-            view.backgroundColor = .systemGray6
-            view.layer.cornerRadius = 16
-            
-            let val = UILabel()
-            val.text = item.1
-            val.font = .systemFont(ofSize: 16, weight: .bold)
-            val.textColor = .systemGreen
-            
-            let name = UILabel()
-            name.text = item.0
-            name.font = .systemFont(ofSize: 12, weight: .medium)
-            name.textColor = .secondaryLabel
-            
-            let stack = UIStackView(arrangedSubviews: [val, name])
-            stack.axis = .vertical
-            stack.alignment = .center
-            stack.spacing = 2
-            
-            view.addSubview(stack)
-            stack.snp.makeConstraints { make in
-                make.center.equalToSuperview()
-            }
-            nutritionStack.addArrangedSubview(view)
-        }
-    }
-    
-    private func createIngredientRow(text: String) -> UIView {
-        let view = UIView()
-        let dot = UIView()
-        dot.backgroundColor = .clear; dot.layer.borderWidth = 2
-        dot.layer.borderColor = UIColor.systemGreen.cgColor; dot.layer.cornerRadius = 6
-        let label = UILabel(); label.text = text; label.numberOfLines = 0; label.font = .systemFont(ofSize: 16)
-        
-        view.addSubview(dot); view.addSubview(label)
-        dot.snp.makeConstraints { make in make.leading.top.equalToSuperview().offset(4); make.width.height.equalTo(12) }
-        label.snp.makeConstraints { make in make.leading.equalTo(dot.snp.trailing).offset(12); make.top.bottom.trailing.equalToSuperview() }
-        return view
-    }
-    
-    private func createInstructionRow(number: Int, text: String) -> UIView {
-        let view = UIView()
-        let numLabel = UILabel()
-        numLabel.text = "\(number)"
-        numLabel.font = .boldSystemFont(ofSize: 14)
-        numLabel.textColor = .white
-        numLabel.textAlignment = .center
-        numLabel.backgroundColor = .systemGreen
-        numLabel.layer.cornerRadius = 12
-        numLabel.clipsToBounds = true
-        
-        let label = UILabel()
-        label.text = text
-        label.numberOfLines = 0
-        label.font = .systemFont(ofSize: 16)
-        
-        view.addSubview(numLabel); view.addSubview(label)
-        numLabel.snp.makeConstraints { make in make.leading.top.equalToSuperview(); make.width.height.equalTo(24) }
-        label.snp.makeConstraints { make in make.leading.equalTo(numLabel.snp.trailing).offset(12); make.top.bottom.trailing.equalToSuperview() }
-        return view
-    }
-    
-    private func updateLikeButtonState() {
-        let image = isFavorite ? UIImage(systemName: "heart.fill") : UIImage(systemName: "heart")
-        let color: UIColor = isFavorite ? .systemRed : .white
-        likeButton.setImage(image, for: .normal)
-        likeButton.tintColor = color
-    }
-    
-    // MARK: - Actions
     @objc private func didTapBack() { navigationController?.popViewController(animated: true) }
     
     @objc private func didTapPlan() {
@@ -555,9 +318,7 @@ class RecipeDetailViewController: UIViewController {
     }
     
     @objc private func didTapLike() {
-        let generator = UIImpactFeedbackGenerator(style: .medium)
-        generator.impactOccurred()
-        
+        let gen = UIImpactFeedbackGenerator(style: .medium); gen.impactOccurred()
         UIView.animate(withDuration: 0.1, animations: { self.likeButton.transform = CGAffineTransform(scaleX: 1.2, y: 1.2) }) { _ in
             UIView.animate(withDuration: 0.1) { self.likeButton.transform = .identity }
         }
@@ -574,7 +335,7 @@ class RecipeDetailViewController: UIViewController {
     
     @objc private func didTapStartCooking() {
         guard let steps = recipe.analyzedInstructions?.first?.steps, !steps.isEmpty else {
-            let alert = UIAlertController(title: "Oops", message: "No step-by-step instructions available.", preferredStyle: .alert)
+            let alert = UIAlertController(title: "Oops", message: "No steps available.", preferredStyle: .alert)
             alert.addAction(UIAlertAction(title: "OK", style: .default))
             present(alert, animated: true)
             return
@@ -583,20 +344,113 @@ class RecipeDetailViewController: UIViewController {
         cookingVC.modalPresentationStyle = .fullScreen
         present(cookingVC, animated: true)
     }
+    
+    private func setupNutrition() {
+        nutritionStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        let nutrients = recipe.nutrition?.nutrients ?? []
+        
+        let ratio = Double(currentServings) / Double(originalServings > 0 ? originalServings : 1)
+        
+        let cal = (nutrients.first(where: { $0.name == "Calories" })?.amount ?? Double(recipe.calories)) * ratio
+        let pro = (nutrients.first(where: { $0.name == "Protein" })?.amount ?? 0) * ratio
+        let fat = (nutrients.first(where: { $0.name == "Fat" })?.amount ?? 0) * ratio
+        let carb = (nutrients.first(where: { $0.name == "Carbohydrates" })?.amount ?? 0) * ratio
+        
+        let items = [
+            ("Calories", "\(Int(cal))"),
+            ("Protein", "\(Int(pro))g"),
+            ("Fat", "\(Int(fat))g"),
+            ("Carbs", "\(Int(carb))g")
+        ]
+        
+        for item in items {
+            let v = UIView()
+            v.backgroundColor = .systemGray6; v.layer.cornerRadius = 16
+            let val = UILabel(); val.text = item.1; val.font = .boldSystemFont(ofSize: 16); val.textColor = .systemGreen
+            let name = UILabel(); name.text = item.0; name.font = .systemFont(ofSize: 12); name.textColor = .secondaryLabel
+            let s = UIStackView(arrangedSubviews: [val, name]); s.axis = .vertical; s.alignment = .center; s.spacing = 2
+            v.addSubview(s); s.snp.makeConstraints { $0.center.equalToSuperview() }
+            nutritionStack.addArrangedSubview(v)
+        }
+    }
+    
+    private func createIngredientRow(text: String) -> UIView {
+        let v = UIView()
+        let d = UIView(); d.backgroundColor = .clear; d.layer.borderWidth = 2; d.layer.borderColor = UIColor.systemGreen.cgColor; d.layer.cornerRadius = 6
+        let l = UILabel(); l.text = text; l.numberOfLines = 0; l.font = .systemFont(ofSize: 16)
+        v.addSubview(d); v.addSubview(l)
+        d.snp.makeConstraints { $0.leading.top.equalToSuperview().offset(4); $0.width.height.equalTo(12) }
+        l.snp.makeConstraints { $0.leading.equalTo(d.snp.trailing).offset(12); $0.top.bottom.trailing.equalToSuperview() }
+        return v
+    }
+    
+    private func createInstructionRow(number: Int, text: String) -> UIView {
+        let v = UIView()
+        let n = UILabel(); n.text = "\(number)"; n.font = .boldSystemFont(ofSize: 14); n.textColor = .white; n.textAlignment = .center; n.backgroundColor = .systemGreen; n.layer.cornerRadius = 12; n.clipsToBounds = true
+        let l = UILabel(); l.text = text; l.numberOfLines = 0; l.font = .systemFont(ofSize: 16)
+        v.addSubview(n); v.addSubview(l)
+        n.snp.makeConstraints { $0.leading.top.equalToSuperview(); $0.width.height.equalTo(24) }
+        l.snp.makeConstraints { $0.leading.equalTo(n.snp.trailing).offset(12); $0.top.bottom.trailing.equalToSuperview() }
+        return v
+    }
+    
+    private func updateLikeButtonState() {
+        let img = isFavorite ? UIImage(systemName: "heart.fill") : UIImage(systemName: "heart")
+        likeButton.setImage(img, for: .normal)
+        likeButton.tintColor = isFavorite ? .systemRed : .white
+    }
+    
+    private func setupUI() {
+        view.addSubview(scrollView); scrollView.snp.makeConstraints { $0.top.leading.trailing.equalToSuperview(); $0.bottom.equalTo(view.safeAreaLayoutGuide).offset(-80) }
+        scrollView.addSubview(contentView); contentView.snp.makeConstraints { $0.edges.width.equalToSuperview() }
+        contentView.addSubview(heroImageView); heroImageView.snp.makeConstraints { $0.top.leading.trailing.equalToSuperview(); $0.height.equalTo(320) }
+        
+        view.addSubview(backButton); backButton.snp.makeConstraints { $0.top.equalTo(view.safeAreaLayoutGuide).offset(10); $0.leading.equalToSuperview().offset(16); $0.width.height.equalTo(40) }
+        view.addSubview(likeButton); likeButton.snp.makeConstraints { $0.top.equalTo(backButton); $0.trailing.equalToSuperview().offset(-16); $0.width.height.equalTo(40) }
+        view.addSubview(planButton); planButton.snp.makeConstraints { $0.top.equalTo(backButton); $0.trailing.equalTo(likeButton.snp.leading).offset(-12); $0.width.height.equalTo(40) }
+        
+        contentView.addSubview(whiteContainer); whiteContainer.snp.makeConstraints { $0.top.equalTo(heroImageView.snp.bottom).offset(-40); $0.leading.trailing.bottom.equalToSuperview() }
+        
+        whiteContainer.addSubview(loadingIndicator); loadingIndicator.snp.makeConstraints { $0.top.equalTo(whiteContainer).offset(20); $0.centerX.equalToSuperview() }
+        
+        whiteContainer.addSubview(titleLabel); titleLabel.snp.makeConstraints { $0.top.equalToSuperview().offset(30); $0.leading.trailing.equalToSuperview().inset(24) }
+        whiteContainer.addSubview(timeLabel); timeLabel.snp.makeConstraints { $0.top.equalTo(titleLabel.snp.bottom).offset(8); $0.leading.trailing.equalToSuperview().inset(24) }
+        
+        whiteContainer.addSubview(nutritionStack); nutritionStack.axis = .horizontal; nutritionStack.distribution = .fillEqually; nutritionStack.spacing = 12
+        nutritionStack.snp.makeConstraints { $0.top.equalTo(timeLabel.snp.bottom).offset(24); $0.leading.trailing.equalToSuperview().inset(24); $0.height.equalTo(70) }
+        
+        whiteContainer.addSubview(servingsContainer)
+        servingsContainer.snp.makeConstraints { $0.top.equalTo(nutritionStack.snp.bottom).offset(24); $0.centerX.equalToSuperview(); $0.width.equalTo(160); $0.height.equalTo(40) }
+        servingsContainer.addSubview(minusButton); minusButton.snp.makeConstraints { $0.leading.top.bottom.equalToSuperview(); $0.width.equalTo(40) }
+        servingsContainer.addSubview(plusButton); plusButton.snp.makeConstraints { $0.trailing.top.bottom.equalToSuperview(); $0.width.equalTo(40) }
+        servingsContainer.addSubview(servingsLabel); servingsLabel.snp.makeConstraints { $0.center.equalToSuperview() }
+        
+        whiteContainer.addSubview(ingredientsHeader); ingredientsHeader.snp.makeConstraints { $0.top.equalTo(servingsContainer.snp.bottom).offset(32); $0.leading.trailing.equalToSuperview().inset(24) }
+        whiteContainer.addSubview(ingredientsStack); ingredientsStack.axis = .vertical; ingredientsStack.spacing = 12
+        ingredientsStack.snp.makeConstraints { $0.top.equalTo(ingredientsHeader.snp.bottom).offset(16); $0.leading.trailing.equalToSuperview().inset(24) }
+        
+        whiteContainer.addSubview(instructionsHeader); instructionsHeader.snp.makeConstraints { $0.top.equalTo(ingredientsStack.snp.bottom).offset(32); $0.leading.trailing.equalToSuperview().inset(24) }
+        whiteContainer.addSubview(instructionsStack); instructionsStack.axis = .vertical; instructionsStack.spacing = 16
+        instructionsStack.snp.makeConstraints { $0.top.equalTo(instructionsHeader.snp.bottom).offset(16); $0.leading.trailing.equalToSuperview().inset(24); $0.bottom.equalToSuperview().offset(-40) }
+        
+        view.addSubview(bottomButtonContainer); bottomButtonContainer.contentView.addSubview(cookButton)
+        bottomButtonContainer.snp.makeConstraints { $0.leading.trailing.bottom.equalToSuperview(); $0.height.equalTo(100) }
+        cookButton.snp.makeConstraints { $0.top.equalToSuperview().offset(16); $0.leading.trailing.equalToSuperview().inset(20); $0.height.equalTo(54) }
+    }
 }
 
-// MARK: - Extension
 extension RecipeDetailViewController: AddMealPlanDelegate {
     func didSaveMealPlan(date: Date, mealType: String) {
-        CoreDataManager.shared.addToMealPlan(recipe: recipe, date: date, mealType: mealType)
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.success)
+        CoreDataManager.shared.addToMealPlan(
+            recipe: recipe,
+            date: date,
+            mealType: mealType,
+            targetServings: currentServings,
+            baseServings: originalServings
+        )
         
-        let formatter = DateFormatter()
-        formatter.dateFormat = "dd MMM"
-        let dateString = formatter.string(from: date)
-        
-        let alert = UIAlertController(title: "Success", message: "Added to \(mealType) on \(dateString)", preferredStyle: .alert)
+        let gen = UINotificationFeedbackGenerator(); gen.notificationOccurred(.success)
+        let alert = UIAlertController(title: "Saved!", message: "Plan added.", preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "OK", style: .default))
         present(alert, animated: true)
     }
