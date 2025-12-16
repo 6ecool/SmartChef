@@ -24,8 +24,6 @@ class CategoryCell: UICollectionViewCell {
     }
     
     required init?(coder: NSCoder) { fatalError() }
-    
-    // Метод для настройки (выбран или нет)
     func configure(text: String, isSelected: Bool) {
         label.text = text
         if isSelected {

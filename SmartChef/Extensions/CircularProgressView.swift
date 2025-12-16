@@ -22,18 +22,13 @@ class CircularProgressView: UIView {
         super.init(coder: coder)
         setupLayers()
     }
-    
     private func setupLayers() {
-        // Настраиваем слои один раз при инициализации
-        
-        // Track (фон)
         trackLayer.fillColor = UIColor.clear.cgColor
         trackLayer.strokeColor = trackColor.cgColor
         trackLayer.lineWidth = 12
         trackLayer.lineCap = .round
         layer.addSublayer(trackLayer)
         
-        // Progress (значение)
         progressLayer.fillColor = UIColor.clear.cgColor
         progressLayer.strokeColor = progressColor.cgColor
         progressLayer.lineWidth = 12
@@ -41,8 +36,6 @@ class CircularProgressView: UIView {
         progressLayer.strokeEnd = 0
         layer.addSublayer(progressLayer)
     }
-    
-    // Обновляем только путь (геометрию), не пересоздавая слои
     private func updatePath() {
         let centerPoint = CGPoint(x: bounds.width / 2, y: bounds.height / 2)
         let circleRadius = (min(bounds.width, bounds.height) - 12) / 2
@@ -52,10 +45,8 @@ class CircularProgressView: UIView {
         trackLayer.path = circularPath.cgPath
         progressLayer.path = circularPath.cgPath
     }
-    
     func setProgress(to value: Float, animated: Bool = true) {
         let clampedValue = max(0.0, min(value, 1.0))
-        
         if animated {
             let animation = CABasicAnimation(keyPath: "strokeEnd")
             animation.duration = 0.5
@@ -69,9 +60,8 @@ class CircularProgressView: UIView {
         }
     }
     
-    // Вызывается при изменении размеров (AutoLayout)
     override func layoutSubviews() {
         super.layoutSubviews()
-        updatePath() // Просто обновляем путь
+        updatePath()
     }
 }

@@ -2,40 +2,27 @@ import UIKit
 import SnapKit
 
 class MainTabBarController: UITabBarController {
-    
-    // MARK: - UI Elements
-    
-    // Плавающая кнопка корзины
     private lazy var basketButton: UIButton = {
         let btn = UIButton()
         btn.backgroundColor = .systemGreen
         btn.setImage(UIImage(systemName: "cart.fill"), for: .normal)
         btn.tintColor = .white
-        btn.layer.cornerRadius = 28 // Половина от 56
-        // Тень для красоты
+        btn.layer.cornerRadius = 28
         btn.layer.shadowColor = UIColor.black.cgColor
         btn.layer.shadowOpacity = 0.3
         btn.layer.shadowOffset = CGSize(width: 0, height: 4)
         btn.layer.shadowRadius = 6
-        
         btn.addTarget(self, action: #selector(didTapBasket), for: .touchUpInside)
         return btn
     }()
     
-    // MARK: - Lifecycle
-    
     override func viewDidLoad() {
         super.viewDidLoad()
-        
         setupTabBarAppearance()
         setupNavBarAppearance()
         setupTabs()
-        
-        // Добавляем плавающую кнопку
         setupFloatingButton()
     }
-    
-    // MARK: - Tab Setup
     
     private func setupTabs() {
         let discoverVC = DiscoverViewController()
@@ -43,43 +30,29 @@ class MainTabBarController: UITabBarController {
         let addRecipeVC = AddRecipeViewController()
         let plannerVC = MealPlannerViewController()
         let profileVC = ProfileViewController()
-        
         let navDiscover = UINavigationController(rootViewController: discoverVC)
         let navFavorites = UINavigationController(rootViewController: favoritesVC)
         let navAdd = UINavigationController(rootViewController: addRecipeVC)
         let navPlanner = UINavigationController(rootViewController: plannerVC)
         let navProfile = UINavigationController(rootViewController: profileVC)
-        
         navDiscover.tabBarItem = UITabBarItem(title: "Search", image: UIImage(systemName: "magnifyingglass"), selectedImage: UIImage(systemName: "text.magnifyingglass"))
         navFavorites.tabBarItem = UITabBarItem(title: "Favorites", image: UIImage(systemName: "heart"), selectedImage: UIImage(systemName: "heart.fill"))
-        
-        // Центральная кнопка (Add)
         navAdd.tabBarItem = UITabBarItem(title: nil, image: UIImage(systemName: "plus.circle"), selectedImage: UIImage(systemName: "plus.circle.fill"))
         navAdd.tabBarItem.imageInsets = UIEdgeInsets(top: 6, left: 0, bottom: -6, right: 0)
-        
         navPlanner.tabBarItem = UITabBarItem(title: "Plan", image: UIImage(systemName: "calendar"), selectedImage: UIImage(systemName: "calendar.badge.clock"))
         navProfile.tabBarItem = UITabBarItem(title: "Profile", image: UIImage(systemName: "person"), selectedImage: UIImage(systemName: "person.fill"))
-        
         setViewControllers([navDiscover, navFavorites, navAdd, navPlanner, navProfile], animated: true)
     }
-    
-    // MARK: - Floating Button Setup
-    
     private func setupFloatingButton() {
-        // Добавляем кнопку прямо в view контроллера таббара, чтобы она была поверх всего
         view.addSubview(basketButton)
-        
         basketButton.snp.makeConstraints { make in
-            // Отступ справа 20
             make.trailing.equalToSuperview().offset(-20)
-            // Отступ снизу: над таббаром (примерно 90-100 от низа экрана)
             make.bottom.equalTo(view.safeAreaLayoutGuide.snp.bottom).offset(-60)
             make.width.height.equalTo(56)
         }
     }
     
     @objc private func didTapBasket() {
-        // Анимация нажатия
         UIView.animate(withDuration: 0.1, animations: {
             self.basketButton.transform = CGAffineTransform(scaleX: 0.9, y: 0.9)
         }) { _ in
@@ -87,18 +60,16 @@ class MainTabBarController: UITabBarController {
                 self.basketButton.transform = .identity
             }
         }
-        
-        // Открываем экран списка покупок
         let shoppingVC = ShoppingListViewController()
         if let sheet = shoppingVC.sheetPresentationController {
-            // Делаем красивую шторку (на половину экрана)
             sheet.detents = [.medium(), .large()]
             sheet.prefersGrabberVisible = true
         }
         present(shoppingVC, animated: true)
     }
     
-    // MARK: - Appearance Setup
+    
+    
     
     private func setupTabBarAppearance() {
         tabBar.tintColor = .systemGreen
@@ -121,7 +92,6 @@ class MainTabBarController: UITabBarController {
         appearance.shadowColor = .clear
         appearance.titleTextAttributes = [.foregroundColor: UIColor.label]
         appearance.largeTitleTextAttributes = [.foregroundColor: UIColor.label]
-        
         UINavigationBar.appearance().standardAppearance = appearance
         UINavigationBar.appearance().compactAppearance = appearance
         UINavigationBar.appearance().scrollEdgeAppearance = appearance

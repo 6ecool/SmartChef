@@ -3,23 +3,17 @@ import SnapKit
 
 class ProfileViewController: UIViewController {
     
-    // MARK: - UI Elements
-    
     private let scrollView: UIScrollView = {
         let sv = UIScrollView()
         sv.showsVerticalScrollIndicator = false
         return sv
     }()
-    
     private let contentView = UIView()
-    
-    // --- Header Section ---
     private let headerContainer: UIView = {
         let v = UIView()
         v.backgroundColor = .systemGreen
         v.layer.cornerRadius = 24
         v.layer.maskedCorners = [.layerMinXMaxYCorner, .layerMaxXMaxYCorner]
-        // Тень
         v.layer.shadowColor = UIColor.systemGreen.cgColor
         v.layer.shadowOpacity = 0.3
         v.layer.shadowOffset = CGSize(width: 0, height: 10)
@@ -29,7 +23,7 @@ class ProfileViewController: UIViewController {
     
     private let avatarImageView: UIImageView = {
         let iv = UIImageView()
-        iv.image = UIImage(systemName: "person.crop.circle.fill") // Можно заменить на "chef_hat" если есть ассет
+        iv.image = UIImage(systemName: "person.crop.circle.fill")
         iv.tintColor = .white
         iv.contentMode = .scaleAspectFit
         iv.layer.borderColor = UIColor.white.cgColor
@@ -38,7 +32,6 @@ class ProfileViewController: UIViewController {
         iv.clipsToBounds = true
         return iv
     }()
-    
     private let nameLabel: UILabel = {
         let l = UILabel()
         l.text = "Chef"
@@ -46,7 +39,6 @@ class ProfileViewController: UIViewController {
         l.textColor = .white
         return l
     }()
-    
     private let levelLabel: UILabel = {
         let l = UILabel()
         l.text = "Novice • Lvl 1"
@@ -55,7 +47,9 @@ class ProfileViewController: UIViewController {
         return l
     }()
     
-    // Прогресс уровня
+    
+    
+    
     private let levelProgress: UIProgressView = {
         let pv = UIProgressView(progressViewStyle: .bar)
         pv.trackTintColor = UIColor.white.withAlphaComponent(0.3)
@@ -64,21 +58,14 @@ class ProfileViewController: UIViewController {
         pv.clipsToBounds = true
         return pv
     }()
-    
-    // --- Calories Section ---
-    private let statsContainer = UIView() // Контейнер для всего белого блока
-    
+    private let statsContainer = UIView()
     private let caloriesTitle: UILabel = {
         let l = UILabel()
         l.text = "Today's Nutrition"
         l.font = .boldSystemFont(ofSize: 18)
         return l
     }()
-    
-    // Наш кастомный круг
     private let circularProgress = CircularProgressView(frame: CGRect(x: 0, y: 0, width: 120, height: 120))
-    
-    // Текст внутри круга
     private let caloriesCountLabel: UILabel = {
         let l = UILabel()
         l.text = "0"
@@ -86,7 +73,6 @@ class ProfileViewController: UIViewController {
         l.textAlignment = .center
         return l
     }()
-    
     private let caloriesGoalLabel: UILabel = {
         let l = UILabel()
         l.text = "/ 2000 kcal"
@@ -95,8 +81,6 @@ class ProfileViewController: UIViewController {
         l.textAlignment = .center
         return l
     }()
-    
-    // Кнопка редактирования цели
     private lazy var editGoalButton: UIButton = {
         let btn = UIButton(type: .system)
         btn.setImage(UIImage(systemName: "pencil.circle.fill"), for: .normal)
@@ -104,12 +88,8 @@ class ProfileViewController: UIViewController {
         btn.addTarget(self, action: #selector(didTapEditGoal), for: .touchUpInside)
         return btn
     }()
-    
-    // --- Stats Grid ---
     private lazy var cookedStatView = createStatBox(icon: "flame.fill", title: "Cooked", color: .systemOrange)
     private lazy var favStatView = createStatBox(icon: "heart.fill", title: "Favorites", color: .systemRed)
-    
-    // --- Settings Section ---
     private lazy var dislikesButton: UIButton = {
         let btn = UIButton(type: .system)
         var config = UIButton.Configuration.gray()
@@ -126,68 +106,46 @@ class ProfileViewController: UIViewController {
         return btn
     }()
     
-    // MARK: - Lifecycle
-    
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .systemBackground
-        // Скрываем стандартный навбар, у нас свой красивый хедер
         navigationController?.setNavigationBarHidden(true, animated: false)
         setupUI()
     }
-    
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         updateData()
     }
     
-    // MARK: - Logic & Updates
-    
     private func updateData() {
         let profile = CoreDataManager.shared.fetchUserProfile()
         let favorites = CoreDataManager.shared.fetchFavorites()
         let todayMeals = CoreDataManager.shared.fetchMealPlan(for: Date())
-        
-        // 1. Stats Update
         updateStatBox(cookedStatView, value: "\(profile.cookedCount)")
         updateStatBox(favStatView, value: "\(favorites.count)")
-        
-        // 2. Level Logic (Геймификация)
-        // Логика: Каждый уровень требует 5 приготовленных блюд
         let totalCooked = Int(profile.cookedCount)
         let currentLevel = (totalCooked / 5) + 1
         let progressToNext = Float(totalCooked % 5) / 5.0
-        
         var rank = "Novice"
         if currentLevel > 5 { rank = "Sous Chef" }
         if currentLevel > 20 { rank = "Master Chef" }
-        
         levelLabel.text = "\(rank) • Lvl \(currentLevel)"
         levelProgress.setProgress(progressToNext, animated: true)
-        
-        // 3. Calories Math (На 1 персону)
         var consumedToday = 0
         
+        
+        
         for meal in todayMeals {
-            // В meal.calories хранится ОБЩАЯ калорийность на ВСЕХ (servings)
             let totalCals = Double(meal.calories)
             let servings = Double(meal.servings > 0 ? meal.servings : 1)
-            
-            // Считаем сколько съел ОДИН человек
             let perPerson = totalCals / servings
             consumedToday += Int(perPerson)
         }
-        
         let goal = Int(profile.calorieGoal)
-        
-        // Обновляем Круг
         caloriesCountLabel.text = "\(consumedToday)"
         caloriesGoalLabel.text = "/ \(goal) kcal"
-        
         let progress = Float(consumedToday) / Float(goal)
         circularProgress.setProgress(to: progress)
-        
-        // Цвет круга: Зеленый, Желтый (близко), Красный (перебор)
         if progress > 1.0 {
             circularProgress.progressColor = .systemRed
         } else if progress > 0.8 {
@@ -196,8 +154,6 @@ class ProfileViewController: UIViewController {
             circularProgress.progressColor = .systemGreen
         }
     }
-    
-    // MARK: - Actions
     
     @objc private func didTapEditGoal() {
         let alert = UIAlertController(title: "Daily Goal", message: "Enter your target calories per day:", preferredStyle: .alert)
@@ -220,34 +176,28 @@ class ProfileViewController: UIViewController {
         present(vc, animated: true)
     }
     
-    // MARK: - UI Setup
-    
     private func setupUI() {
         view.addSubview(scrollView)
         scrollView.addSubview(contentView)
-        scrollView.contentInsetAdjustmentBehavior = .never // Чтобы хедер уходил под статус бар
+        scrollView.contentInsetAdjustmentBehavior = .never
         
         scrollView.snp.makeConstraints { make in
             make.top.leading.trailing.bottom.equalToSuperview()
         }
         contentView.snp.makeConstraints { make in
-        make.top.leading.trailing.equalToSuperview() // Верх и бока к ScrollView
-        make.width.equalToSuperview()                // Ширина равна экрану
-        make.bottom.equalToSuperview().offset(-20)   // Низ с отступом (это определяет высоту скролла)
+        make.top.leading.trailing.equalToSuperview()
+        make.width.equalToSuperview()
+        make.bottom.equalToSuperview().offset(-20)
         }
-        
-        // --- 1. Header ---
         contentView.addSubview(headerContainer)
         headerContainer.addSubview(avatarImageView)
         headerContainer.addSubview(nameLabel)
         headerContainer.addSubview(levelLabel)
         headerContainer.addSubview(levelProgress)
-        
         headerContainer.snp.makeConstraints { make in
             make.top.leading.trailing.equalToSuperview()
-            make.height.equalTo(260) // Высокий красивый хедер
+            make.height.equalTo(260)
         }
-        
         avatarImageView.snp.makeConstraints { make in
             make.top.equalToSuperview().offset(80)
             make.centerX.equalToSuperview()
@@ -267,33 +217,25 @@ class ProfileViewController: UIViewController {
             make.width.equalTo(120)
             make.height.equalTo(4)
         }
-        
-        // --- 2. Calories Circle ---
         contentView.addSubview(caloriesTitle)
         contentView.addSubview(circularProgress)
         contentView.addSubview(editGoalButton)
-        
-        // Лейблы ВНУТРИ круга
         circularProgress.addSubview(caloriesCountLabel)
         circularProgress.addSubview(caloriesGoalLabel)
-        
         caloriesTitle.snp.makeConstraints { make in
             make.top.equalTo(headerContainer.snp.bottom).offset(30)
             make.leading.equalToSuperview().offset(24)
         }
-        
         editGoalButton.snp.makeConstraints { make in
             make.centerY.equalTo(caloriesTitle)
             make.trailing.equalToSuperview().offset(-24)
             make.width.height.equalTo(44)
         }
-        
         circularProgress.snp.makeConstraints { make in
             make.top.equalTo(caloriesTitle.snp.bottom).offset(20)
             make.centerX.equalToSuperview()
-            make.width.height.equalTo(150) // Размер круга
+            make.width.height.equalTo(150)
         }
-        
         caloriesCountLabel.snp.makeConstraints { make in
             make.centerY.equalToSuperview().offset(-10)
             make.centerX.equalToSuperview()
@@ -302,8 +244,6 @@ class ProfileViewController: UIViewController {
             make.top.equalTo(caloriesCountLabel.snp.bottom).offset(4)
             make.centerX.equalToSuperview()
         }
-        
-        // --- 3. Stats Grid ---
         let stack = UIStackView(arrangedSubviews: [cookedStatView, favStatView])
         stack.axis = .horizontal
         stack.distribution = .fillEqually
@@ -315,14 +255,12 @@ class ProfileViewController: UIViewController {
             make.leading.trailing.equalToSuperview().inset(24)
             make.height.equalTo(90)
         }
-        
-        // --- 4. Dislikes Button ---
         contentView.addSubview(dislikesButton)
         dislikesButton.snp.makeConstraints { make in
             make.top.equalTo(stack.snp.bottom).offset(30)
             make.leading.trailing.equalToSuperview().inset(24)
             make.height.equalTo(60)
-            make.bottom.equalToSuperview().offset(-40) // Конец скролла
+            make.bottom.equalToSuperview().offset(-40)
         }
     }
     
@@ -356,11 +294,9 @@ class ProfileViewController: UIViewController {
         sub.text = title
         sub.font = .systemFont(ofSize: 13, weight: .medium)
         sub.textColor = .secondaryLabel
-        
         v.addSubview(iconView)
         v.addSubview(val)
         v.addSubview(sub)
-        
         iconView.snp.makeConstraints { make in
             make.leading.top.equalToSuperview().offset(12)
             make.width.height.equalTo(32)
@@ -375,7 +311,6 @@ class ProfileViewController: UIViewController {
         }
         return v
     }
-    
     private func updateStatBox(_ view: UIView, value: String) {
         (view.viewWithTag(100) as? UILabel)?.text = value
     }

@@ -1,4 +1,4 @@
-// Extensions/UIImageView+Ext.swift
+
 import UIKit
 
 let imageCache = NSCache<NSString, UIImage>()
@@ -6,30 +6,26 @@ let imageCache = NSCache<NSString, UIImage>()
 extension UIImageView {
     
     func loadImage(from urlString: String) {
-        // 1. Сбрасываем текущую картинку (чтобы не было "мелькания" старых фото при переиспользовании ячейки)
         self.image = nil
+        if urlString.hasPrefix("file://") || urlString.contains("/Documents/") {
+            if let image = UIImage(contentsOfFile: urlString.replacingOccurrences(of: "file://", with: "")) {
+                self.image = image
+                return
+            } else if let url = URL(string: urlString), let data = try? Data(contentsOf: url), let image = UIImage(data: data) {
+                self.image = image
+                return
+            }
+        }
         
         guard let url = URL(string: urlString) else { return }
-        
-        // 2. Проверяем кэш: если картинка уже скачана, берем её оттуда
         if let cachedImage = imageCache.object(forKey: urlString as NSString) {
             self.image = cachedImage
             return
         }
-        
-        // 3. Если нет в кэше — качаем
         let task = URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
-            guard let self = self,
-                  let data = data,
-                  let downloadedImage = UIImage(data: data) else { return }
-            
-            // 4. Сохраняем в кэш
+            guard let self = self, let data = data, let downloadedImage = UIImage(data: data) else { return }
             imageCache.setObject(downloadedImage, forKey: urlString as NSString)
-            
-            // 5. Обновляем UI на главном потоке
-            DispatchQueue.main.async {
-                self.image = downloadedImage
-            }
+            DispatchQueue.main.async { self.image = downloadedImage }
         }
         task.resume()
     }

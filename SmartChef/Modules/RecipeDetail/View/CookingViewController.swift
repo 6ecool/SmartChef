@@ -6,19 +6,16 @@ class CookingViewController: UIViewController {
     private let steps: [Step]
     private var currentStepIndex = 0
     
-    // MARK: - UI Elements
-    
     private lazy var closeButton: UIButton = {
         let btn = UIButton(type: .close)
         btn.addTarget(self, action: #selector(closeTapped), for: .touchUpInside)
         return btn
     }()
     
-    // 1. Добавили Скролл, чтобы длинный текст влезал
     private let scrollView: UIScrollView = {
         let sv = UIScrollView()
         sv.showsVerticalScrollIndicator = true
-        sv.alwaysBounceVertical = true // Чтобы скроллилось даже если текст короткий (приятный эффект)
+        sv.alwaysBounceVertical = true
         return sv
     }()
     
@@ -34,23 +31,22 @@ class CookingViewController: UIViewController {
     
     private let stepLabel: UILabel = {
         let label = UILabel()
-        label.font = .systemFont(ofSize: 26, weight: .bold) // Чуть уменьшил для читаемости
+        label.font = .systemFont(ofSize: 26, weight: .bold)
         label.numberOfLines = 0
         label.textAlignment = .center
         label.textColor = .label
         return label
     }()
     
-    // 2. Кнопка "Назад"
     private lazy var previousButton: UIButton = {
         let btn = UIButton(type: .system)
         btn.setTitle("Previous", for: .normal)
-        btn.backgroundColor = .systemGray5 // Серый фон, чтобы отличалась
+        btn.backgroundColor = .systemGray5
         btn.setTitleColor(.label, for: .normal)
         btn.layer.cornerRadius = 16
         btn.titleLabel?.font = .boldSystemFont(ofSize: 18)
         btn.addTarget(self, action: #selector(prevStep), for: .touchUpInside)
-        btn.alpha = 0 // Скрыта на первом шаге
+        btn.alpha = 0
         return btn
     }()
     
@@ -65,7 +61,6 @@ class CookingViewController: UIViewController {
         return btn
     }()
     
-    // Стек для кнопок внизу
     private let buttonsStack: UIStackView = {
         let stack = UIStackView()
         stack.axis = .horizontal
@@ -74,7 +69,6 @@ class CookingViewController: UIViewController {
         return stack
     }()
     
-    // MARK: - Init
     init(steps: [Step]) {
         self.steps = steps
         super.init(nibName: nil, bundle: nil)
@@ -82,7 +76,6 @@ class CookingViewController: UIViewController {
     
     required init?(coder: NSCoder) { fatalError() }
     
-    // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .systemBackground
@@ -92,19 +85,15 @@ class CookingViewController: UIViewController {
     
     private func setupUI() {
         view.addSubview(closeButton)
-        view.addSubview(buttonsStack) // Сначала кнопки, чтобы привязать к ним скролл
+        view.addSubview(buttonsStack)
         view.addSubview(scrollView)
         
-        // Добавляем кнопки в стек
         buttonsStack.addArrangedSubview(previousButton)
         buttonsStack.addArrangedSubview(nextButton)
         
-        // Настраиваем внутренности скролла
         scrollView.addSubview(contentView)
         contentView.addSubview(progressLabel)
         contentView.addSubview(stepLabel)
-        
-        // --- CONSTRAINTS ---
         
         closeButton.snp.makeConstraints { make in
             make.top.equalTo(view.safeAreaLayoutGuide).offset(16)
@@ -112,14 +101,12 @@ class CookingViewController: UIViewController {
             make.width.height.equalTo(32)
         }
         
-        // Кнопки прибиты к низу экрана
         buttonsStack.snp.makeConstraints { make in
             make.bottom.equalTo(view.safeAreaLayoutGuide).offset(-20)
             make.leading.trailing.equalToSuperview().inset(24)
             make.height.equalTo(56)
         }
         
-        // Скролл занимает место между хедером и кнопками
         scrollView.snp.makeConstraints { make in
             make.top.equalTo(closeButton.snp.bottom).offset(10)
             make.leading.trailing.equalToSuperview()
@@ -128,18 +115,18 @@ class CookingViewController: UIViewController {
         
         contentView.snp.makeConstraints { make in
             make.edges.equalToSuperview()
-            make.width.equalToSuperview() // Важно для вертикального скролла
+            make.width.equalToSuperview()
         }
         
         progressLabel.snp.makeConstraints { make in
-            make.top.equalToSuperview().offset(40) // Отступ сверху внутри скролла
+            make.top.equalToSuperview().offset(40)
             make.centerX.equalToSuperview()
         }
         
         stepLabel.snp.makeConstraints { make in
             make.top.equalTo(progressLabel.snp.bottom).offset(24)
             make.leading.trailing.equalToSuperview().inset(24)
-            make.bottom.equalToSuperview().offset(-60) // Отступ снизу внутри скролла
+            make.bottom.equalToSuperview().offset(-60)
         }
     }
     
@@ -150,10 +137,8 @@ class CookingViewController: UIViewController {
         progressLabel.text = "Step \(index + 1) of \(steps.count)"
         stepLabel.text = step.step
         
-        // Сбрасываем скролл наверх при смене шага
         scrollView.setContentOffset(.zero, animated: true)
         
-        // Логика кнопок
         if index == 0 {
             UIView.animate(withDuration: 0.2) {
                 self.previousButton.alpha = 0
@@ -193,12 +178,19 @@ class CookingViewController: UIViewController {
     }
     
     private func updateStepWithAnimation() {
-        UIView.transition(with: stepLabel, duration: 0.3, options: .transitionCrossDissolve, animations: {
-            self.showStep(at: self.currentStepIndex)
-        }, completion: nil)
+        UIView.transition(
+            with: stepLabel,
+            duration: 0.3,
+            options: .transitionCrossDissolve,
+            animations: {
+                self.showStep(at: self.currentStepIndex)
+            },
+            completion: nil
+        )
     }
     
     @objc private func closeTapped() {
         dismiss(animated: true)
     }
 }
+

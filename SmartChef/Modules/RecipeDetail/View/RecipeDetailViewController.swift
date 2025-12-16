@@ -165,17 +165,13 @@ class RecipeDetailViewController: UIViewController {
         
         isFavorite = CoreDataManager.shared.isFavorite(recipeID: recipe.id)
         updateLikeButtonState()
-        
         configureData()
-        
-        // Если это не редактирование существующего, то можно подгружать детали
         if editingMealPlanItem == nil {
             if (recipe.extendedIngredients?.isEmpty ?? true) || recipe.readyInMinutes == 0 {
                 fetchFullRecipeDetails()
             }
         }
     }
-    
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         navigationController?.setNavigationBarHidden(true, animated: animated)
@@ -207,8 +203,17 @@ class RecipeDetailViewController: UIViewController {
     }
     
     private func configureData() {
-        if let imageString = recipe.image, let url = URL(string: imageString) {
-            heroImageView.kf.setImage(with: url)
+        if let imageString = recipe.image {
+            if imageString.contains("/Documents/") {
+                if let image = UIImage(contentsOfFile: imageString) {
+                    heroImageView.image = image
+                }
+            }
+            else if let url = URL(string: imageString) {
+                heroImageView.kf.setImage(with: url)
+            }
+        } else {
+            heroImageView.image = nil 
         }
         
         titleLabel.text = recipe.title
@@ -316,23 +321,6 @@ class RecipeDetailViewController: UIViewController {
         vc.modalTransitionStyle = .crossDissolve
         present(vc, animated: true)
     }
-    
-    @objc private func didTapLike() {
-        let gen = UIImpactFeedbackGenerator(style: .medium); gen.impactOccurred()
-        UIView.animate(withDuration: 0.1, animations: { self.likeButton.transform = CGAffineTransform(scaleX: 1.2, y: 1.2) }) { _ in
-            UIView.animate(withDuration: 0.1) { self.likeButton.transform = .identity }
-        }
-        
-        if isFavorite {
-            CoreDataManager.shared.deleteFavorite(recipeID: recipe.id)
-            isFavorite = false
-        } else {
-            CoreDataManager.shared.saveFavorite(recipe: recipe)
-            isFavorite = true
-        }
-        updateLikeButtonState()
-    }
-    
     @objc private func didTapStartCooking() {
         guard let steps = recipe.analyzedInstructions?.first?.steps, !steps.isEmpty else {
             let alert = UIAlertController(title: "Oops", message: "No steps available.", preferredStyle: .alert)
@@ -384,6 +372,43 @@ class RecipeDetailViewController: UIViewController {
         return v
     }
     
+    @objc private func didTapLike() {
+        let gen = UIImpactFeedbackGenerator(style: .medium); gen.impactOccurred()
+        UIView.animate(withDuration: 0.1, animations: { self.likeButton.transform = CGAffineTransform(scaleX: 1.2, y: 1.2) }) { _ in
+                UIView.animate(withDuration: 0.1) { self.likeButton.transform = .identity }
+        }
+        if recipe.id < 0 {
+            showDeleteConfirmation()
+        } else {
+            if isFavorite {
+                CoreDataManager.shared.deleteFavorite(recipeID: recipe.id)
+                isFavorite = false
+            } else {
+                CoreDataManager.shared.saveFavorite(recipe: recipe)
+                isFavorite = true
+            }
+            updateLikeButtonState()
+        }
+    }
+        
+        private func showDeleteConfirmation() {
+            let alert = UIAlertController(
+                title: "Delete Recipe?",
+                message: "This is your custom recipe. Unliking it will permanently delete it.",
+                preferredStyle: .actionSheet
+            )
+            
+            alert.addAction(UIAlertAction(title: "Delete", style: .destructive, handler: { [weak self] _ in
+                guard let self = self else { return }
+                CoreDataManager.shared.deleteUserRecipe(recipeID: self.recipe.id)
+                self.navigationController?.popViewController(animated: true)
+            }))
+            
+            alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+            
+            present(alert, animated: true)
+        }
+    
     private func createInstructionRow(number: Int, text: String) -> UIView {
         let v = UIView()
         let n = UILabel(); n.text = "\(number)"; n.font = .boldSystemFont(ofSize: 14); n.textColor = .white; n.textAlignment = .center; n.backgroundColor = .systemGreen; n.layer.cornerRadius = 12; n.clipsToBounds = true
@@ -399,7 +424,6 @@ class RecipeDetailViewController: UIViewController {
         likeButton.setImage(img, for: .normal)
         likeButton.tintColor = isFavorite ? .systemRed : .white
     }
-    
     private func setupUI() {
         view.addSubview(scrollView); scrollView.snp.makeConstraints { $0.top.leading.trailing.equalToSuperview(); $0.bottom.equalTo(view.safeAreaLayoutGuide).offset(-80) }
         scrollView.addSubview(contentView); contentView.snp.makeConstraints { $0.edges.width.equalToSuperview() }

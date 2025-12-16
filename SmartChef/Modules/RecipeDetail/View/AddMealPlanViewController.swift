@@ -9,10 +9,7 @@ class AddMealPlanViewController: UIViewController {
     
     weak var delegate: AddMealPlanDelegate?
     
-    // Выбранная дата (по умолчанию сегодня)
     private var selectedDate = Date()
-    
-    // MARK: - UI Elements
     
     private let containerView: UIView = {
         let view = UIView()
@@ -24,6 +21,9 @@ class AddMealPlanViewController: UIViewController {
         return view
     }()
     
+    
+    
+    
     private let titleLabel: UILabel = {
         let label = UILabel()
         label.text = "Add to Meal Plan"
@@ -32,19 +32,15 @@ class AddMealPlanViewController: UIViewController {
         return label
     }()
     
-    // 1. Поле даты
     private lazy var dateTextField: UITextField = {
         let tf = UITextField()
         tf.placeholder = "Select date"
         tf.borderStyle = .roundedRect
-        tf.textAlignment = .center // По центру красивее
+        tf.textAlignment = .center
         tf.font = .systemFont(ofSize: 16, weight: .medium)
         tf.textColor = .systemGreen
-        
-        // Вместо клавиатуры показываем DatePicker
         tf.inputView = datePicker
         
-        // Добавляем тулбар с кнопкой "Done"
         let toolbar = UIToolbar()
         toolbar.sizeToFit()
         let flexSpace = UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil)
@@ -56,7 +52,6 @@ class AddMealPlanViewController: UIViewController {
         return tf
     }()
     
-    // Иконка календаря (теперь просто для красоты, нажимать можно и на поле)
     private lazy var calendarButton: UIButton = {
         let btn = UIButton()
         btn.setImage(UIImage(systemName: "calendar"), for: .normal)
@@ -65,12 +60,10 @@ class AddMealPlanViewController: UIViewController {
         return btn
     }()
     
-    // 👇 ИСПРАВЛЕННЫЙ DATE PICKER (Стиль Календаря)
     private lazy var datePicker: UIDatePicker = {
         let picker = UIDatePicker()
         picker.datePickerMode = .date
         
-        // Используем современный стиль календаря (iOS 14+)
         if #available(iOS 14.0, *) {
             picker.preferredDatePickerStyle = .inline
         } else {
@@ -79,15 +72,11 @@ class AddMealPlanViewController: UIViewController {
         
         picker.tintColor = .systemGreen
         picker.addTarget(self, action: #selector(dateChanged), for: .valueChanged)
-        
-        // Если хочешь разрешить выбирать прошедшие даты (чтобы месяц переключался назад),
-        // закомментируй строку ниже:
         picker.minimumDate = Date()
         
         return picker
     }()
     
-    // 2. Выбор типа (Breakfast, Lunch, Dinner)
     private let typeLabel: UILabel = {
         let label = UILabel()
         label.text = "Choose meal type:"
@@ -99,16 +88,14 @@ class AddMealPlanViewController: UIViewController {
     private let typeSegmentedControl: UISegmentedControl = {
         let items = ["Breakfast", "Lunch", "Dinner"]
         let sc = UISegmentedControl(items: items)
-        sc.selectedSegmentIndex = 1 // Lunch по умолчанию
+        sc.selectedSegmentIndex = 1
         sc.selectedSegmentTintColor = .systemGreen
         
-        // Делаем текст белым при выборе
         let titleTextAttributes = [NSAttributedString.Key.foregroundColor: UIColor.white]
         sc.setTitleTextAttributes(titleTextAttributes, for: .selected)
         return sc
     }()
     
-    // 3. Кнопки (Cancel / Choose)
     private lazy var cancelButton: UIButton = {
         let btn = UIButton(type: .system)
         btn.setTitle("Cancel", for: .normal)
@@ -131,34 +118,32 @@ class AddMealPlanViewController: UIViewController {
         return btn
     }()
     
-    // Форматтер для отображения даты
     private let dateFormatter: DateFormatter = {
         let df = DateFormatter()
-        df.dateFormat = "EEE, dd MMM yyyy" // Более красивый формат (Tue, 14 Dec 2024)
+        df.dateFormat = "EEE, dd MMM yyyy"
         return df
     }()
     
-    // MARK: - Lifecycle
+    
+    
+    
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        // Делаем фон затемненным
         view.backgroundColor = UIColor.black.withAlphaComponent(0.5)
-        
         setupUI()
-        
-        // Устанавливаем текущую дату в поле
         dateTextField.text = dateFormatter.string(from: Date())
     }
     
     private func setupUI() {
         view.addSubview(containerView)
         
-        // Центрируем контейнер (поднимаем чуть выше центра для клавиатуры)
         containerView.snp.makeConstraints { make in
             make.centerY.equalToSuperview().offset(-50)
             make.leading.trailing.equalToSuperview().inset(24)
         }
+        
+        
         
         containerView.addSubview(titleLabel)
         containerView.addSubview(dateTextField)
@@ -168,14 +153,11 @@ class AddMealPlanViewController: UIViewController {
         containerView.addSubview(cancelButton)
         containerView.addSubview(chooseButton)
         
-        // Констрейнты
-        
         titleLabel.snp.makeConstraints { make in
             make.top.equalToSuperview().offset(24)
             make.leading.trailing.equalToSuperview().inset(16)
         }
         
-        // Поле даты
         dateTextField.snp.makeConstraints { make in
             make.top.equalTo(titleLabel.snp.bottom).offset(24)
             make.leading.equalToSuperview().offset(20)
@@ -189,7 +171,6 @@ class AddMealPlanViewController: UIViewController {
             make.width.height.equalTo(30)
         }
         
-        // Тип еды
         typeLabel.snp.makeConstraints { make in
             make.top.equalTo(dateTextField.snp.bottom).offset(24)
             make.leading.equalToSuperview().offset(20)
@@ -201,7 +182,8 @@ class AddMealPlanViewController: UIViewController {
             make.height.equalTo(40)
         }
         
-        // Кнопки внизу
+        
+        
         let buttonStack = UIStackView(arrangedSubviews: [cancelButton, chooseButton])
         buttonStack.axis = .horizontal
         buttonStack.distribution = .fillEqually
@@ -216,17 +198,13 @@ class AddMealPlanViewController: UIViewController {
         }
     }
     
-    // MARK: - Actions
-    
     @objc private func didTapCalendarIcon() {
-        // При нажатии на иконку открываем ввод даты
         dateTextField.becomeFirstResponder()
     }
     
     @objc private func dateChanged() {
         selectedDate = datePicker.date
         dateTextField.text = dateFormatter.string(from: selectedDate)
-        // Не скрываем календарь сразу, чтобы пользователь мог передумать
     }
     
     @objc private func didTapDoneDate() {
@@ -236,15 +214,11 @@ class AddMealPlanViewController: UIViewController {
     @objc private func didTapCancel() {
         dismiss(animated: true)
     }
-    
     @objc private func didTapChoose() {
-        // Получаем тип еды
         let index = typeSegmentedControl.selectedSegmentIndex
         let mealType = typeSegmentedControl.titleForSegment(at: index) ?? "Lunch"
-        
-        // Отправляем данные делегату
         delegate?.didSaveMealPlan(date: selectedDate, mealType: mealType)
-        
         dismiss(animated: true)
     }
 }
+

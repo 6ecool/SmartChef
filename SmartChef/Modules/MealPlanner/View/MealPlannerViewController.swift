@@ -6,13 +6,13 @@ class MealPlannerViewController: UIViewController {
     private var breakfastItems: [MealPlanItem] = []
     private var lunchItems: [MealPlanItem] = []
     private var dinnerItems: [MealPlanItem] = []
-    
-    // MARK: - UI Elements
     private let headerView: UIView = {
         let view = UIView()
         view.backgroundColor = .systemBackground
         return view
     }()
+    
+    
     
     private let dateLabel: UILabel = {
         let label = UILabel()
@@ -31,6 +31,9 @@ class MealPlannerViewController: UIViewController {
         return picker
     }()
     
+    
+    
+    
     private lazy var tableView: UITableView = {
         let tv = UITableView(frame: .zero, style: .insetGrouped)
         tv.backgroundColor = .systemGray6
@@ -39,6 +42,8 @@ class MealPlannerViewController: UIViewController {
         tv.register(MealPlanCell.self, forCellReuseIdentifier: MealPlanCell.identifier)
         return tv
     }()
+    
+    
     
     private let emptyLabel: UILabel = {
         let label = UILabel()
@@ -49,8 +54,6 @@ class MealPlannerViewController: UIViewController {
         label.isHidden = true
         return label
     }()
-    
-    // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .systemBackground
@@ -65,60 +68,48 @@ class MealPlannerViewController: UIViewController {
         loadData()
     }
     
-    // MARK: - Setup
     private func setupUI() {
         view.addSubview(headerView)
         headerView.addSubview(dateLabel)
         headerView.addSubview(datePicker)
         view.addSubview(tableView)
         view.addSubview(emptyLabel)
-        
         headerView.snp.makeConstraints { make in
             make.top.equalTo(view.safeAreaLayoutGuide.snp.top)
             make.leading.trailing.equalToSuperview()
             make.height.equalTo(60)
         }
-        
         dateLabel.snp.makeConstraints { make in
             make.leading.equalToSuperview().offset(20)
             make.centerY.equalToSuperview()
         }
-        
         datePicker.snp.makeConstraints { make in
             make.trailing.equalToSuperview().offset(-20)
             make.centerY.equalToSuperview()
         }
-        
         tableView.snp.makeConstraints { make in
             make.top.equalTo(headerView.snp.bottom)
             make.leading.trailing.bottom.equalToSuperview()
         }
-        
         emptyLabel.snp.makeConstraints { make in
             make.center.equalTo(tableView)
             make.leading.trailing.equalToSuperview().inset(40)
         }
     }
     
-    // MARK: - Data Logic
     @objc private func dateChanged() {
         loadData()
     }
-    
     private func loadData() {
         let allItems = CoreDataManager.shared.fetchMealPlan(for: datePicker.date)
-        
         breakfastItems = allItems.filter { $0.mealType == "Breakfast" }
         lunchItems = allItems.filter { $0.mealType == "Lunch" }
         dinnerItems = allItems.filter { $0.mealType == "Dinner" }
-        
         tableView.reloadData()
-        
         let isEmpty = breakfastItems.isEmpty && lunchItems.isEmpty && dinnerItems.isEmpty
         emptyLabel.isHidden = !isEmpty
         tableView.isHidden = isEmpty
     }
-    
     private func deleteItem(at indexPath: IndexPath) {
         let item: MealPlanItem
         switch indexPath.section {
@@ -129,8 +120,6 @@ class MealPlannerViewController: UIViewController {
         CoreDataManager.shared.deleteFromMealPlan(item: item)
         loadData()
     }
-    
-    // Вспомогательный метод для получения данных для перехода
     private func getMealData(for indexPath: IndexPath) -> (recipe: Recipe, item: MealPlanItem) {
         let item: MealPlanItem
         switch indexPath.section {
@@ -138,28 +127,22 @@ class MealPlannerViewController: UIViewController {
         case 1: item = lunchItems[indexPath.row]
         default: item = dinnerItems[indexPath.row]
         }
-        
         var ingredients: [Ingredient]? = nil
         if let d = item.ingredients?.data(using: .utf8) {
             ingredients = try? JSONDecoder().decode([Ingredient].self, from: d)
         }
-        
         var instructions: [InstructionSection]? = nil
         if let d = item.instructions?.data(using: .utf8) {
             instructions = try? JSONDecoder().decode([InstructionSection].self, from: d)
         }
-        
-        // Восстанавливаем рецепт
         let baseServings = Int(item.originalServings > 0 ? item.originalServings : 1)
         let targetServings = Int(item.servings > 0 ? item.servings : 1)
-        
-        // Восстанавливаем БАЗОВЫЕ калории (обратная математика), чтобы RecipeDetailVC мог их снова умножать
-        // item.calories хранит уже умноженные.
-        // Base = Scaled / (Target / Base)
         let ratio = Double(targetServings) / Double(baseServings)
         let baseCalories = Double(item.calories) / ratio
         
-        // Восстанавливаем нутриенты (парсим строки "10g")
+        
+        
+        
         let prot = Double(item.protein?.replacingOccurrences(of: "g", with: "") ?? "0") ?? 0
         let fat = Double(item.fat?.replacingOccurrences(of: "g", with: "") ?? "0") ?? 0
         let carb = Double(item.carbs?.replacingOccurrences(of: "g", with: "") ?? "0") ?? 0
@@ -168,7 +151,7 @@ class MealPlannerViewController: UIViewController {
             id: Int(item.id),
             title: item.title ?? "Unknown",
             image: item.image,
-            readyInMinutes: Int(item.time), // Теперь берем из базы
+            readyInMinutes: Int(item.time),
             servings: baseServings,
             nutrition: Nutrition(nutrients: [
                 Nutrient(name: "Calories", amount: baseCalories, unit: "kcal"),
@@ -185,12 +168,8 @@ class MealPlannerViewController: UIViewController {
         return (recipe, item)
     }
 }
-
-// MARK: - TableView
 extension MealPlannerViewController: UITableViewDataSource, UITableViewDelegate {
-    
     func numberOfSections(in tableView: UITableView) -> Int { 3 }
-    
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         switch section {
         case 0: return breakfastItems.count
@@ -200,6 +179,9 @@ extension MealPlannerViewController: UITableViewDataSource, UITableViewDelegate 
         }
     }
     
+    
+    
+    
     func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
         switch section {
         case 0: return breakfastItems.isEmpty ? nil : "Breakfast"
@@ -208,7 +190,6 @@ extension MealPlannerViewController: UITableViewDataSource, UITableViewDelegate 
         default: return nil
         }
     }
-    
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: MealPlanCell.identifier, for: indexPath) as! MealPlanCell
         let item: MealPlanItem
@@ -229,20 +210,15 @@ extension MealPlannerViewController: UITableViewDataSource, UITableViewDelegate 
         }
         return cell
     }
-    
     func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat { 80 }
-    
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
-        
         let data = getMealData(for: indexPath)
-        
         let detailVC = RecipeDetailViewController(
             recipe: data.recipe,
             initialServings: Int(data.item.servings)
         )
         detailVC.editingMealPlanItem = data.item
-        
         detailVC.hidesBottomBarWhenPushed = true
         navigationController?.pushViewController(detailVC, animated: true)
     }

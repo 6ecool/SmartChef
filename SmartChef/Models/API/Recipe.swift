@@ -14,8 +14,7 @@ struct Recipe: Codable {
     let extendedIngredients: [Ingredient]?
     let analyzedInstructions: [InstructionSection]?
     let summary: String?
-    let instructions: String? // <-- НОВОЕ ПОЛЕ (Запасной текст)
-    
+    let instructions: String?
     var calories: Int { getNutrient(name: "Calories") }
     var protein: String { "\(getNutrient(name: "Protein"))g" }
     var fat: String { "\(getNutrient(name: "Fat"))g" }
@@ -29,8 +28,6 @@ struct Recipe: Codable {
         return 0
     }
 }
-
-// ... Остальные структуры (InstructionSection, Step, etc.) оставляем как были
 struct InstructionSection: Codable {
     let steps: [Step]
 }
@@ -38,14 +35,10 @@ struct Step: Codable {
     let number: Int
     let step: String
 }
-// Внутри Models/API/Recipe.swift
-
 struct Ingredient: Codable {
     let id: Int?
     let name: String?
-    let original: String? // Старое поле (полный текст)
-    
-    // 👇 Новые поля для математики
+    let original: String?
     let amount: Double?
     let unit: String?
 }
